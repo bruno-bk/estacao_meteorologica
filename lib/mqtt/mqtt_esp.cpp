@@ -35,6 +35,10 @@ boolean client_mqtt_is_connected(){
 }
 
 void send_mqtt_message(const char* topic, const char* msg) {
+    Serial.print("send: ");
+    Serial.print(msg);
+    Serial.print(" to ");
+    Serial.println(topic);
     client_mqtt.publish(topic, msg);
 }
 
