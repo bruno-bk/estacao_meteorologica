@@ -7,9 +7,37 @@
 #include "config.h"
 
 #define DHTPIN 4
+#define ENCODERPIN 5
 
 DHT dht(DHTPIN, DHT11);
-AS5600 as5600; 
+AS5600 as5600;
+
+volatile long pulses;
+unsigned long timeold;
+
+void IRAM_ATTR counter() {
+    pulses++;
+}
+
+void read_encoder() {
+    detachInterrupt(ENCODERPIN);
+    char wind_speed[5];
+
+    double rps = ((1000 / 20.0) / (millis() - timeold)) * pulses;
+    double speed = rps * 0.5340707511102649 * 3.6; // 0.5340707511102649 = PI*0.085m
+    pulses = 0;
+
+    Serial.print(rps);
+    Serial.print(" rps | ");
+    Serial.print(speed);
+    Serial.println(" km/h");
+
+    dtostrf(speed, 1, 1, wind_speed);
+    send_mqtt_message("station/wind_speed", wind_speed);
+
+    timeold = millis();
+    attachInterrupt(ENCODERPIN, counter, RISING);    
+}
 
 void read_DHT11() {
     float h = dht.readHumidity();
@@ -40,6 +68,10 @@ void read_as5600() {
 void setup() {
     Serial.begin(115200);
 
+    pinMode(ENCODERPIN, INPUT);
+    timeold = millis();
+    attachInterrupt(ENCODERPIN, counter, FALLING);
+
     dht.begin();
 
     as5600.begin(4);
@@ -55,6 +87,7 @@ void loop() {
 
     read_DHT11();
     read_as5600();
+    read_encoder();
 
     delay(5000);
 }
