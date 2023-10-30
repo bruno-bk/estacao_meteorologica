@@ -2,6 +2,7 @@
 #include <DHT.h>
 #include <AS5600.h>
 #include <Adafruit_BMP280.h>
+#include <BH1750.h>
 
 #include "wifi_esp.h"
 #include "mqtt_esp.h"
@@ -13,9 +14,23 @@
 DHT dht(DHTPIN, DHT11);
 AS5600 as5600;
 Adafruit_BMP280 bmp280;
+BH1750 bh1750;
 
 volatile long pulses;
 unsigned long timeold;
+
+void read_bh1750() {
+    float l = bh1750.readLightLevel();
+    if (l < 0) {
+        Serial.println(F("Failed to read lux from bh1750 sensor!"));
+    } else {
+        char lux[8];
+        sprintf(lux, "%d", (uint32_t)l);
+        Serial.print("Lux: ");
+        Serial.println(lux);
+        send_mqtt_message("station/lux", lux);
+    }
+}
 
 void read_bmp280() {
     float t = bmp280.readTemperature();
@@ -107,6 +122,10 @@ void setup() {
         Serial.println("Could not find a valid BME280 sensor.");
     }
 
+    if (!bh1750.begin(bh1750.CONTINUOUS_HIGH_RES_MODE, 0x23)){
+        Serial.println("Could not find a valid BH1750 sensor.");
+    }
+
     set_parameters_wifi(WIFI_SSID, WIFI_PASSWORD);
     set_parameters_mqtt(MQTT_SERVER, MQTT_PORT, MQTT_USER, MQTT_PASSWORD);
 }
@@ -119,6 +138,7 @@ void loop() {
     read_as5600();
     read_encoder();
     read_bmp280();
+    read_bh1750();
 
     delay(5000);
 }
