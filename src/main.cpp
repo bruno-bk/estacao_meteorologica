@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <DHT.h>
 #include <AS5600.h>
+#include <Adafruit_BMP280.h>
 
 #include "wifi_esp.h"
 #include "mqtt_esp.h"
@@ -11,9 +12,34 @@
 
 DHT dht(DHTPIN, DHT11);
 AS5600 as5600;
+Adafruit_BMP280 bmp280;
 
 volatile long pulses;
 unsigned long timeold;
+
+void read_bmp280() {
+    float t = bmp280.readTemperature();
+    if (isnan(t)) {
+        Serial.println(F("Failed to read temperature from bmp280 sensor!"));
+    } else {
+        char temperature[8];
+        dtostrf(t, 1, 1, temperature);
+        Serial.print("Temperature: ");
+        Serial.println(temperature);
+        send_mqtt_message("station/temperature", temperature);
+    }
+
+    float p = bmp280.readPressure();
+    if (isnan(p)) {
+        Serial.println(F("Failed to read pressure from bmp280 sensor!"));
+    } else {
+        char pressure[10];
+        dtostrf((p /= 100), 1, 1, pressure);
+        Serial.print("Pressure: ");
+        Serial.println(pressure);
+        send_mqtt_message("station/pressure", pressure);
+    }
+}
 
 void IRAM_ATTR counter() {
     pulses++;
@@ -76,7 +102,11 @@ void setup() {
 
     as5600.begin(4);
     as5600.setDirection(AS5600_CLOCK_WISE);
-    
+
+    if (!bmp280.begin(0x76)) {
+        Serial.println("Could not find a valid BME280 sensor.");
+    }
+
     set_parameters_wifi(WIFI_SSID, WIFI_PASSWORD);
     set_parameters_mqtt(MQTT_SERVER, MQTT_PORT, MQTT_USER, MQTT_PASSWORD);
 }
@@ -88,6 +118,7 @@ void loop() {
     read_DHT11();
     read_as5600();
     read_encoder();
+    read_bmp280();
 
     delay(5000);
 }
