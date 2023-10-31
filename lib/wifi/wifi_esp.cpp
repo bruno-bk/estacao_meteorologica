@@ -28,8 +28,11 @@ void set_parameters_wifi(const char* wifi_ssid, const char* wifi_password) {
     strcpy(password, wifi_password);
 }
 
-void wifi_loop() {
-    if (WiFi.status() != WL_CONNECTED){
-        connect_wifi();
+void wifi_loop( void * pvParameters ) {
+    for(;;) {
+        if (WiFi.status() != WL_CONNECTED){
+            connect_wifi();
+        }
+        vTaskDelay(5000/portTICK_PERIOD_MS);
     }
 }

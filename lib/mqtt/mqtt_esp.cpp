@@ -49,10 +49,14 @@ void set_parameters_mqtt(const char* server, int port, const char* user, const c
     strcpy(mqtt_password, password);
 }
 
-void mqtt_loop() {
-    if (!client_mqtt.connected()) {
-        connect_broker();
+void mqtt_loop(void *pvParameters) {
+    TickType_t xLastWakeTime = xTaskGetTickCount();
+    for(;;) {
+        if (!client_mqtt.connected()) {
+            connect_broker();
+        }
+        client_mqtt.loop();
+        vTaskDelayUntil(&xLastWakeTime, 5000/portTICK_PERIOD_MS );
     }
-    client_mqtt.loop();
 }
 
