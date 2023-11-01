@@ -4,6 +4,13 @@
 
 #include <PubSubClient.h>
 
+extern QueueHandle_t lux;
+extern QueueHandle_t temperature;
+extern QueueHandle_t pressure;
+extern QueueHandle_t wind_speed;
+extern QueueHandle_t humidity;
+extern QueueHandle_t angle;
+
 extern WiFiClient wifi_esp;
 PubSubClient client_mqtt(wifi_esp);
 
@@ -49,10 +56,47 @@ void set_parameters_mqtt(const char* server, int port, const char* user, const c
     strcpy(mqtt_password, password);
 }
 
+void send_messages_to_broker() {
+    float read_value;
+    char message[10];
+
+    if (xQueueReceive(lux, &read_value, pdMS_TO_TICKS(0)) == true) {
+        sprintf(message, "%d", (uint32_t)read_value);
+        send_mqtt_message("station/lux", message);
+    }
+
+    if (xQueueReceive(temperature, &read_value, pdMS_TO_TICKS(0)) == true) {
+        sprintf(message, "%.1f", read_value);
+        send_mqtt_message("station/temperature", message);
+    }
+
+    if (xQueueReceive(pressure, &read_value, pdMS_TO_TICKS(0)) == true) {
+        sprintf(message, "%.1f", (read_value /= 100));
+        send_mqtt_message("station/pressure", message);
+    }
+
+    if (xQueueReceive(wind_speed, &read_value, pdMS_TO_TICKS(0)) == true) {
+        sprintf(message, "%.1f", read_value);
+        send_mqtt_message("station/wind_speed", message);
+    }
+
+    if (xQueueReceive(humidity, &read_value, pdMS_TO_TICKS(0)) == true) {
+        sprintf(message, "%d", (uint32_t)read_value);
+        send_mqtt_message("station/humidity", message);
+    }
+
+    if (xQueueReceive(angle, &read_value, pdMS_TO_TICKS(0)) == true) {
+        sprintf(message, "%d", (uint32_t)read_value);
+        send_mqtt_message("station/angle", message);
+    }
+}
+
 void mqtt_loop(void *pvParameters) {
     TickType_t xLastWakeTime = xTaskGetTickCount();
     for(;;) {
-        if (!client_mqtt.connected()) {
+        if (client_mqtt.connected()) {
+            send_messages_to_broker();
+        } else {
             connect_broker();
         }
         client_mqtt.loop();
