@@ -3,6 +3,7 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <freertos/queue.h>
+#include <freertos/semphr.h>
 
 #include <DHT.h>
 #include <AS5600.h>
@@ -20,6 +21,8 @@ QueueHandle_t wind_speed;
 QueueHandle_t humidity;
 QueueHandle_t angle;
 
+SemaphoreHandle_t xMutex_I2C = NULL;
+
 #define DHTPIN 4
 #define ENCODERPIN 5
 
@@ -36,7 +39,9 @@ void read_bh1750(void * pvParameters) {
     TickType_t xLastWakeTime = xTaskGetTickCount();
 
     for(;;) {
+        xSemaphoreTake(xMutex_I2C,portMAX_DELAY );
         l = bh1750.readLightLevel();
+        xSemaphoreGive(xMutex_I2C);
         if (l < 0) {
             Serial.println(F("Failed to read lux from bh1750 sensor!"));
         } else {
@@ -53,7 +58,9 @@ void read_bmp280(void * pvParameters) {
     TickType_t xLastWakeTime = xTaskGetTickCount();
 
     for(;;) {
+        xSemaphoreTake(xMutex_I2C,portMAX_DELAY );
         t = bmp280.readTemperature();
+        xSemaphoreGive(xMutex_I2C);
         if (isnan(t)) {
             Serial.println(F("Failed to read temperature from bmp280 sensor!"));
         } else {
@@ -123,7 +130,9 @@ void read_as5600(void * pvParameters) {
     TickType_t xLastWakeTime = xTaskGetTickCount();
 
     for(;;) {
+        xSemaphoreTake(xMutex_I2C,portMAX_DELAY );
         a = abs(as5600.rawAngle()*360.0/4095.0);
+        xSemaphoreGive(xMutex_I2C);
 
         xQueueSend(angle, &a, pdMS_TO_TICKS(0));
 
@@ -153,6 +162,8 @@ void setup() {
 
     set_parameters_wifi(WIFI_SSID, WIFI_PASSWORD);
     set_parameters_mqtt(MQTT_SERVER, MQTT_PORT, MQTT_USER, MQTT_PASSWORD);
+
+    xMutex_I2C = xSemaphoreCreateMutex();
 
     lux = xQueueCreate(10, sizeof(float));
     temperature = xQueueCreate(10, sizeof(float));
