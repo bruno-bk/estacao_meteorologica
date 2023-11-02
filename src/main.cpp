@@ -74,6 +74,16 @@ void read_bmp280(void * pvParameters) {
     float x[3] = {0, 0, 0};
     float y[3] = {0, 0, 0};
 
+    const uint8_t SAMPLING_AMOUNT = 25;
+    float moving_average[SAMPLING_AMOUNT];
+    uint8_t index = 0;
+    float sum = 0;
+    for (index = 0; index < SAMPLING_AMOUNT; index++){
+        moving_average[index] = bmp280.readPressure();
+        sum += moving_average[index];
+    }
+    index = 0;
+
     TickType_t xLastWakeTime = xTaskGetTickCount();
 
     for(;;) {
@@ -95,6 +105,16 @@ void read_bmp280(void * pvParameters) {
         if (isnan(p)) {
             Serial.println(F("Failed to read pressure from bmp280 sensor!"));
         } else {
+            sum -= moving_average[index];
+            moving_average[index] = p;
+            sum += moving_average[index];
+
+            index++;
+            if(index == SAMPLING_AMOUNT){
+                index = 0;
+            }
+
+            p = sum/SAMPLING_AMOUNT;
             xQueueSend(pressure, &p, pdMS_TO_TICKS(0));
         }
     }
