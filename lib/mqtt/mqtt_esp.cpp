@@ -100,7 +100,7 @@ void mqtt_loop(void *pvParameters) {
             connect_broker();
         }
         client_mqtt.loop();
-        vTaskDelayUntil(&xLastWakeTime, 5000/portTICK_PERIOD_MS );
+        vTaskDelayUntil(&xLastWakeTime, 1000/portTICK_PERIOD_MS );
     }
 }
 
