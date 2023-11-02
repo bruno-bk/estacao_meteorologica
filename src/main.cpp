@@ -152,6 +152,18 @@ void read_encoder(void * pvParameters) {
 
 void read_DHT11(void * pvParameters) {
     float h;
+    const uint8_t SAMPLING_AMOUNT = 25;
+    float moving_average[SAMPLING_AMOUNT];
+    uint8_t index = 0;
+    float sum = 0;
+    while (isnan(dht.readHumidity())){
+        delay(1000);
+    }
+    for (index = 0; index < SAMPLING_AMOUNT; index++){
+        moving_average[index] = dht.readHumidity();
+        sum += moving_average[index];
+    }
+    index = 0;
 
     TickType_t xLastWakeTime = xTaskGetTickCount();
 
@@ -160,6 +172,16 @@ void read_DHT11(void * pvParameters) {
         if (isnan(h)) {
             Serial.println(F("Failed to read from DHT sensor!"));
         } else {
+            sum -= moving_average[index];
+            moving_average[index] = h;
+            sum += moving_average[index];
+
+            index++;
+            if(index == SAMPLING_AMOUNT){
+                index = 0;
+            }
+
+            h = sum/SAMPLING_AMOUNT;
             xQueueSend(humidity, &h, pdMS_TO_TICKS(0));
         }
 
