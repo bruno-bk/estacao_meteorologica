@@ -51,21 +51,45 @@ void read_bh1750(void * pvParameters) {
     }
 }
 
+float filter(float input, float* x, float* y, const float* a, const float* b) {
+  x[2] = x[1];
+  x[1] = x[0];
+  y[2] = y[1];
+  y[1] = y[0];
+  
+  x[0] = input;
+
+  y[0] = (b[0] * x[0] + b[1] * x[1] + b[2] * x[2] - a[1] * y[1] -  a[2] * y[2]);
+
+  return y[0];
+}
+
 void read_bmp280(void * pvParameters) {
     float t;
     float p;
+    
+    const float a[] = {1, -0.9390625058174923, 0};
+    const float b[] = {0.030468747091253818, 0.030468747091253818, 0};
+
+    float x[3] = {0, 0, 0};
+    float y[3] = {0, 0, 0};
 
     TickType_t xLastWakeTime = xTaskGetTickCount();
 
     for(;;) {
-        xSemaphoreTake(xMutex_I2C,portMAX_DELAY );
-        t = bmp280.readTemperature();
-        xSemaphoreGive(xMutex_I2C);
-        if (isnan(t)) {
-            Serial.println(F("Failed to read temperature from bmp280 sensor!"));
-        } else {
-            xQueueSend(temperature, &t, pdMS_TO_TICKS(0));
+        for(int i = 0; i < 100; i++){
+            xSemaphoreTake(xMutex_I2C,portMAX_DELAY );
+            t = bmp280.readTemperature();
+            xSemaphoreGive(xMutex_I2C);
+
+            if (isnan(t)) {
+                Serial.println(F("Failed to read temperature from bmp280 sensor!"));
+            } else {
+                t = filter(t, x, y, a, b);
+            }
+            vTaskDelayUntil(&xLastWakeTime, 100/portTICK_PERIOD_MS );
         }
+        xQueueSend(temperature, &t, pdMS_TO_TICKS(0));
 
         p = bmp280.readPressure();
         if (isnan(p)) {
@@ -73,7 +97,6 @@ void read_bmp280(void * pvParameters) {
         } else {
             xQueueSend(pressure, &p, pdMS_TO_TICKS(0));
         }
-        vTaskDelayUntil(&xLastWakeTime, 10000/portTICK_PERIOD_MS );
     }
 }
 
