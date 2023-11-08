@@ -36,6 +36,7 @@ unsigned long timeold;
 
 void read_bh1750(void * pvParameters) {
     float l;
+    float last_l = 0;
     TickType_t xLastWakeTime = xTaskGetTickCount();
 
     for(;;) {
@@ -44,7 +45,8 @@ void read_bh1750(void * pvParameters) {
         xSemaphoreGive(xMutex_I2C);
         if (l < 0) {
             Serial.println(F("Failed to read lux from bh1750 sensor!"));
-        } else {
+        } else if (abs(l - last_l) >= 3000) {
+            last_l = l;
             xQueueSend(lux, &l, pdMS_TO_TICKS(0));
         }
         vTaskDelayUntil(&xLastWakeTime, 60000/portTICK_PERIOD_MS );
@@ -66,7 +68,9 @@ float filter(float input, float* x, float* y, const float* a, const float* b) {
 
 void read_bmp280(void * pvParameters) {
     float t;
+    float last_t = 0;
     float p;
+    float last_p = 0;
     
     const float a[] = {1, -0.9390625058174923, 0};
     const float b[] = {0.030468747091253818, 0.030468747091253818, 0};
@@ -79,7 +83,7 @@ void read_bmp280(void * pvParameters) {
     uint8_t index = 0;
     float sum = 0;
     for (index = 0; index < SAMPLING_AMOUNT; index++){
-        moving_average[index] = bmp280.readPressure();
+        moving_average[index] = bmp280.readPressure()/100;
         sum += moving_average[index];
     }
     index = 0;
@@ -87,7 +91,7 @@ void read_bmp280(void * pvParameters) {
     TickType_t xLastWakeTime = xTaskGetTickCount();
 
     for(;;) {
-        for(int i = 0; i < 100; i++){
+        for(int i = 0; i < 200; i++){
             xSemaphoreTake(xMutex_I2C,portMAX_DELAY );
             t = bmp280.readTemperature();
             xSemaphoreGive(xMutex_I2C);
@@ -99,9 +103,14 @@ void read_bmp280(void * pvParameters) {
             }
             vTaskDelayUntil(&xLastWakeTime, 100/portTICK_PERIOD_MS );
         }
-        xQueueSend(temperature, &t, pdMS_TO_TICKS(0));
+
+        if (abs(t - last_t) >= 0.5) {
+            last_t = t;
+            xQueueSend(temperature, &t, pdMS_TO_TICKS(0));
+        }
 
         p = bmp280.readPressure();
+        p /= 100;
         if (isnan(p)) {
             Serial.println(F("Failed to read pressure from bmp280 sensor!"));
         } else {
@@ -115,7 +124,11 @@ void read_bmp280(void * pvParameters) {
             }
 
             p = sum/SAMPLING_AMOUNT;
-            xQueueSend(pressure, &p, pdMS_TO_TICKS(0));
+
+            if (abs(p - last_p) >= 0.5) {
+                last_p = p;
+                xQueueSend(pressure, &p, pdMS_TO_TICKS(0));
+            }
         }
     }
 }
@@ -127,6 +140,7 @@ void IRAM_ATTR counter() {
 void read_encoder(void * pvParameters) {
     float rps;
     float speed;
+    float last_speed = 0;
 
     TickType_t xLastWakeTime = xTaskGetTickCount();
 
@@ -136,22 +150,21 @@ void read_encoder(void * pvParameters) {
         speed = rps * 0.5340707511102649 * 3.6; // 0.5340707511102649 = PI*0.085m
         pulses = 0;
 
-        Serial.print(rps);
-        Serial.print(" rps | ");
-        Serial.print(speed);
-        Serial.println(" km/h");
-
-        xQueueSend(wind_speed, &speed, pdMS_TO_TICKS(0));
+        if (abs(speed - last_speed) >= 0.5) {
+            last_speed = speed;
+            xQueueSend(wind_speed, &speed, pdMS_TO_TICKS(0));
+        }
 
         timeold = millis();
         attachInterrupt(ENCODERPIN, counter, RISING);
 
-        vTaskDelayUntil(&xLastWakeTime, 5000/portTICK_PERIOD_MS );
+        vTaskDelayUntil(&xLastWakeTime, 30000/portTICK_PERIOD_MS );
     }
 }
 
 void read_DHT11(void * pvParameters) {
     float h;
+    float last_h = 0;
     const uint8_t SAMPLING_AMOUNT = 25;
     float moving_average[SAMPLING_AMOUNT];
     uint8_t index = 0;
@@ -182,15 +195,19 @@ void read_DHT11(void * pvParameters) {
             }
 
             h = sum/SAMPLING_AMOUNT;
-            xQueueSend(humidity, &h, pdMS_TO_TICKS(0));
-        }
 
-        vTaskDelayUntil(&xLastWakeTime, 10000/portTICK_PERIOD_MS );
+            if (abs(h - last_h) >= 1) {
+                last_h = h;
+                xQueueSend(humidity, &h, pdMS_TO_TICKS(0));
+            }
+        }
+        vTaskDelayUntil(&xLastWakeTime, 20000/portTICK_PERIOD_MS );
     }
 }
 
 void read_as5600(void * pvParameters) {
     float a;
+    float last_a = 0;
 
     TickType_t xLastWakeTime = xTaskGetTickCount();
 
@@ -199,9 +216,12 @@ void read_as5600(void * pvParameters) {
         a = abs(as5600.rawAngle()*360.0/4095.0);
         xSemaphoreGive(xMutex_I2C);
 
-        xQueueSend(angle, &a, pdMS_TO_TICKS(0));
+        if (abs(a - last_a) >= 3.6) {
+            last_a = a;
+            xQueueSend(angle, &a, pdMS_TO_TICKS(0));
+        }
 
-        vTaskDelayUntil(&xLastWakeTime, 10000/portTICK_PERIOD_MS );
+        vTaskDelayUntil(&xLastWakeTime, 30000/portTICK_PERIOD_MS );
     }
 }
 

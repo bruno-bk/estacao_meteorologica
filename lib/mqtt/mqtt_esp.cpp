@@ -42,7 +42,9 @@ boolean client_mqtt_is_connected(){
 }
 
 void send_mqtt_message(const char* topic, const char* msg) {
-    Serial.print("send: ");
+    Serial.print("[");
+    Serial.print(millis());
+    Serial.print("] send: ");
     Serial.print(msg);
     Serial.print(" to ");
     Serial.println(topic);
@@ -71,7 +73,7 @@ void send_messages_to_broker() {
     }
 
     if (xQueueReceive(pressure, &read_value, pdMS_TO_TICKS(0)) == true) {
-        sprintf(message, "%.1f", (read_value /= 100));
+        sprintf(message, "%.1f", (read_value));
         send_mqtt_message("station/pressure", message);
     }
 
