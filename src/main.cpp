@@ -37,11 +37,12 @@ unsigned long timeold;
 void read_bh1750(void * pvParameters) {
     float l;
     float last_l = 0;
+    float calibration = 0;
     TickType_t xLastWakeTime = xTaskGetTickCount();
 
     for(;;) {
         xSemaphoreTake(xMutex_I2C,portMAX_DELAY );
-        l = bh1750.readLightLevel();
+        l = bh1750.readLightLevel() + calibration;
         xSemaphoreGive(xMutex_I2C);
         if (l < 0) {
             Serial.println(F("Failed to read lux from bh1750 sensor!"));
@@ -69,8 +70,11 @@ float filter(float input, float* x, float* y, const float* a, const float* b) {
 void read_bmp280(void * pvParameters) {
     float t;
     float last_t = 0;
+    float calibration_t = 0;
     float p;
     float last_p = 0;
+    float calibration_p = 0;
+
     
     const float a[] = {1, -0.9390625058174923, 0};
     const float b[] = {0.030468747091253818, 0.030468747091253818, 0};
@@ -83,7 +87,7 @@ void read_bmp280(void * pvParameters) {
     uint8_t index = 0;
     float sum = 0;
     for (index = 0; index < SAMPLING_AMOUNT; index++){
-        moving_average[index] = bmp280.readPressure()/100;
+        moving_average[index] = (bmp280.readPressure()/100) + calibration_p;
         sum += moving_average[index];
     }
     index = 0;
@@ -93,7 +97,7 @@ void read_bmp280(void * pvParameters) {
     for(;;) {
         for(int i = 0; i < 200; i++){
             xSemaphoreTake(xMutex_I2C,portMAX_DELAY );
-            t = bmp280.readTemperature();
+            t = bmp280.readTemperature() + calibration_t;
             xSemaphoreGive(xMutex_I2C);
 
             if (isnan(t)) {
@@ -111,6 +115,7 @@ void read_bmp280(void * pvParameters) {
 
         p = bmp280.readPressure();
         p /= 100;
+        p += calibration_p;
         if (isnan(p)) {
             Serial.println(F("Failed to read pressure from bmp280 sensor!"));
         } else {
@@ -140,6 +145,7 @@ void IRAM_ATTR counter() {
 void read_encoder(void * pvParameters) {
     float rps;
     float speed;
+    float calibration = 0;
     float last_speed = 0;
 
     TickType_t xLastWakeTime = xTaskGetTickCount();
@@ -148,6 +154,7 @@ void read_encoder(void * pvParameters) {
         detachInterrupt(ENCODERPIN);
         rps = ((1000 / 20.0) / (millis() - timeold)) * pulses;
         speed = rps * 0.5340707511102649 * 3.6; // 0.5340707511102649 = PI*0.085m
+        speed += calibration;
         pulses = 0;
 
         if (abs(speed - last_speed) >= 0.5) {
@@ -165,6 +172,7 @@ void read_encoder(void * pvParameters) {
 void read_DHT11(void * pvParameters) {
     float h;
     float last_h = 0;
+    float calibration = 0;
     const uint8_t SAMPLING_AMOUNT = 25;
     float moving_average[SAMPLING_AMOUNT];
     uint8_t index = 0;
@@ -173,7 +181,7 @@ void read_DHT11(void * pvParameters) {
         delay(1000);
     }
     for (index = 0; index < SAMPLING_AMOUNT; index++){
-        moving_average[index] = dht.readHumidity();
+        moving_average[index] = dht.readHumidity() + calibration;
         sum += moving_average[index];
     }
     index = 0;
@@ -181,7 +189,7 @@ void read_DHT11(void * pvParameters) {
     TickType_t xLastWakeTime = xTaskGetTickCount();
 
     for(;;) {
-        h = dht.readHumidity();
+        h = dht.readHumidity() + calibration;
         if (isnan(h)) {
             Serial.println(F("Failed to read from DHT sensor!"));
         } else {
@@ -208,6 +216,7 @@ void read_DHT11(void * pvParameters) {
 void read_as5600(void * pvParameters) {
     float a;
     float last_a = 0;
+    float calibration = 0;
 
     TickType_t xLastWakeTime = xTaskGetTickCount();
 
@@ -215,6 +224,7 @@ void read_as5600(void * pvParameters) {
         xSemaphoreTake(xMutex_I2C,portMAX_DELAY );
         a = abs(as5600.rawAngle()*360.0/4095.0);
         xSemaphoreGive(xMutex_I2C);
+        a += calibration;
 
         if (abs(a - last_a) >= 3.6) {
             last_a = a;
