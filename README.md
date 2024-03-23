@@ -35,6 +35,16 @@ Certifique-se de conectar os sensores corretamente ao ESP32 de acordo com as ins
 
 Uma vez que o hardware e o software estejam configurados corretamente, o ESP32 começará a coletar dados meteorológicos automaticamente. Esses dados serão enviados ao broken MQTT configurado no código.
 
+## Broker MQTT
+
+Para realizar os testes, foi configurado um servidor MQTT com o Mosquitto. Para detalhes de como realizar essa configuração, consulte a [documentação oficial](https://mosquitto.org/).
+
+## Interface gráfica
+
+Este tópico é opcional.
+Foi construída uma interface gráfica utilizando Node-RED. O painel pode ser encontrado no arquivo "dashboard/dashboard_nodered.json". Esta interface oferece controle da [estufa](https://github.com/bruno-bk/estufa) e monitoramento da [estação meteorológica](https://github.com/bruno-bk/estacao_meteorologica). A interface se conecta ao broker MQTT e atualiza todos os dados em tempo real no painel.
+![Imagem mostrando o dashboard](dashboard/dashboard_estacao_meteorologica.png)
+
 ## Contribuição
 
 Contribuições são bem-vindas! Sinta-se à vontade para fazer um fork deste repositório, trabalhar em melhorias e enviar um pull request.
